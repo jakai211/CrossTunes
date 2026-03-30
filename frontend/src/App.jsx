@@ -302,7 +302,17 @@ function SourcePills({ sources }) {
   )
 }
 
-function SongCard({ song, index }) {
+function SongCard({ song, index, comments = [], onAddComment, onRemoveComment }) {
+  const [draftComment, setDraftComment] = useState('')
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    const trimmed = draftComment.trim()
+    if (!trimmed) return
+    onAddComment(song.id, trimmed)
+    setDraftComment('')
+  }
+
   return (
     <article className="song-card">
       <div className="song-card-rank" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
@@ -326,6 +336,39 @@ function SongCard({ song, index }) {
         <button type="button" className="song-play-btn" aria-label={`Play ${song.title}`}>
           &#9654;
         </button>
+      </div>
+
+      <div className="song-meta-comments">
+        <div className="song-comments-header">Comments</div>
+        {comments.length > 0 ? (
+          <ul className="song-comments-list">
+            {comments.map((comment, i) => (
+              <li key={`${song.id}-comment-${i}`} className="song-comment-item">
+                <span>{comment}</span>
+                <button
+                  type="button"
+                  className="song-comment-delete"
+                  onClick={() => onRemoveComment(song.id, i)}
+                  aria-label={`Delete comment ${i + 1} on ${song.title}`}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="song-no-comments">No comments yet. Be the first to add one.</p>
+        )}
+
+        <form className="song-comment-form" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            aria-label={`Comment on ${song.title}`}
+            placeholder="Add a comment..."
+            value={draftComment}
+            onChange={(event) => setDraftComment(event.target.value)}
+          />
+          <button type="submit" className="song-comment-submit">Add</button>
+        </form>
       </div>
     </article>
   )
@@ -373,6 +416,32 @@ function App() {
   const [chatResult, setChatResult] = useState(null)
   const [isThinking, setIsThinking] = useState(false)
   const [chatHint, setChatHint] = useState('')
+
+  const [songComments, setSongComments] = useState({
+    1: ['Smooth drive anthem, this hits late night mode'],
+    2: ['Great production layers, static texture is pure mood'],
+  })
+
+  const addSongComment = (songId, comment) => {
+    if (!comment || !comment.trim()) return
+    const trimmed = comment.trim()
+    setSongComments((prev) => ({
+      ...prev,
+      [songId]: [...(prev[songId] || []), trimmed],
+    }))
+  }
+
+  const removeSongComment = (songId, index) => {
+    setSongComments((prev) => {
+      const current = prev[songId] || []
+      if (index < 0 || index >= current.length) return prev
+      const next = [...current.slice(0, index), ...current.slice(index + 1)]
+      return {
+        ...prev,
+        [songId]: next,
+      }
+    })
+  }
 
   const navigateTo = (page) => {
     if (!validPages.includes(page)) {
@@ -635,7 +704,14 @@ function App() {
             <h2 className="hub-section-title">Trending Tracks</h2>
             <div className="song-grid">
               {trendingSongs.map((song, i) => (
-                <SongCard key={song.id} song={song} index={i} />
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  index={i}
+                  comments={songComments[song.id] || []}
+                  onAddComment={addSongComment}
+                  onRemoveComment={removeSongComment}
+                />
               ))}
             </div>
           </section>
