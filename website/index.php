@@ -2,9 +2,9 @@
 session_start();
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-   <title>Inventory Helper</title>
+   <title>CrossTune</title>
    <link rel="stylesheet" type="text/css" href="ih_styles.css">
    <link rel="icon" type="image/png" href="images/logo.png">
 </head>
@@ -12,7 +12,7 @@ session_start();
    <header>
        <?php if (file_exists("header.inc.php")) include("header.inc.php"); ?>
    </header>
-   <section style="height: 375px;">
+   <section>
        <nav>
            <?php if (file_exists("nav.inc.php")) include("nav.inc.php"); ?>
        </nav>

@@ -1,0 +1,228 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+ 
+body {
+  background-color: #1a1a1a;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+ 
+header {
+  padding: 0;
+}
+ 
+section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto !important;
+}
+ 
+section nav {
+  display: none;
+}
+ 
+section main {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+ 
+footer {
+  padding: 16px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}
+ 
+/* ── Login Card ── */
+.login-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 48px 40px 40px;
+  width: 100%;
+  max-width: 430px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  animation: fadeUp 0.4s ease both;
+}
+ 
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+ 
+/* ── Logo ── */
+.logo-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+ 
+.logo-icon {
+  background: #7c3aed;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.5px;
+}
+ 
+.logo-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+ 
+/* ── Heading ── */
+.login-card h2 {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 28px;
+}
+ 
+/* ── Form ── */
+form[name="login"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+ 
+form[name="login"] label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+  margin-top: 16px;
+}
+ 
+form[name="login"] label:first-of-type {
+  margin-top: 0;
+}
+ 
+form[name="login"] input[type="text"],
+form[name="login"] input[type="password"] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 14px;
+  color: #111;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+ 
+form[name="login"] input[type="text"]:focus,
+form[name="login"] input[type="password"]:focus {
+  border-color: #7c3aed;
+}
+ 
+/* ── MFA notice ── */
+.mfa-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+}
+ 
+.mfa-notice input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: #7c3aed;
+  flex-shrink: 0;
+}
+ 
+/* ── Submit ── */
+form[name="login"] input[type="submit"] {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+ 
+form[name="login"] input[type="submit"]:hover {
+  background: #6d28d9;
+}
+ 
+form[name="login"] input[type="submit"]:active {
+  transform: scale(0.98);
+}
+ 
+/* ── Links ── */
+.login-links {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #555;
+}
+ 
+.login-links a {
+  color: #7c3aed;
+  text-decoration: none;
+  font-weight: 500;
+}
+ 
+.login-links a:hover {
+  text-decoration: underline;
+}
+ 
+/* ── Logged-in state ── */
+.welcome-box {
+  text-align: center;
+  color: #111;
+}
+ 
+.welcome-box h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+ 
+.welcome-box p {
+  color: #555;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+ 
+.welcome-box a {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 10px 28px;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+ 
+.welcome-box a:hover {
+  background: #6d28d9;
+}
+ 
