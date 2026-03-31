@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { useState } from "react";
-import { loginUser } from "./api/auth";
+import { registerUser, loginUser } from "./api/auth";
 
 const featuredPlaylists = [
   {
