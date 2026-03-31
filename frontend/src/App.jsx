@@ -420,6 +420,11 @@ function App() {
   const [chatHint, setChatHint] = useState('')
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [regFirstName, setRegFirstName] = useState("");
+  const [regLastName, setRegLastName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
 
   const [songComments, setSongComments] = useState({
     1: ['Smooth drive anthem, this hits late night mode'],
@@ -555,6 +560,26 @@ function App() {
     localStorage.setItem("token", data.token);
     navigateTo("home");
   }
+  async function handleRegister(e) {
+    e.preventDefault();
+
+    if (regPassword !== regConfirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+
+    const username = `${regFirstName} ${regLastName}`;
+
+    const data = await registerUser(regEmail, regPassword, username);
+
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+
+  localStorage.setItem("token", data.token);
+  navigateTo("home");
+}
 
   return (
     <>
@@ -937,6 +962,7 @@ function App() {
       <form onSubmit={handleLogin}>
         <input
           type="email"
+          name="email"
           placeholder="Email Address"
           required
           value={email}
@@ -945,6 +971,7 @@ function App() {
 
         <input
           type="password"
+          name="password"
           placeholder="Password"
           required
           value={password}
@@ -971,6 +998,7 @@ function App() {
     </div>
   </main>
 )}
+
 
 
       <aside className="dj-widget-wrap" aria-label="CrossFade DJ recommender">
@@ -1055,27 +1083,80 @@ function App() {
       </aside>
 
       {currentPage === 'register' && (
-        <main className="container auth-page">
-          <div className="auth-card auth-card-wide">
-            <span className="brand-badge standalone-badge">CT</span>
-            <h1>Create Account</h1>
-            <p className="auth-intro">Start building shared playlists that survive platform boundaries.</p>
-            <form>
-              <div className="name-row">
-                <input type="text" placeholder="First Name" required />
-                <input type="text" placeholder="Last Name" required />
-              </div>
-              <input type="email" placeholder="Email Address" required />
-              <input type="password" placeholder="Password" required />
-              <input type="password" placeholder="Confirm Password" required />
-              <button type="submit" className="btn-primary auth-submit">
-                Create CrossTunes Account
-              </button>
-              <p className="auth-switch">Already have an account? <a href="#/login" onClick={(e) => { e.preventDefault(); navigateTo('login') }}>Log in →</a></p>
-            </form>
-          </div>
-        </main>
-      )}
+  <main className="container auth-page">
+    <div className="auth-card auth-card-wide">
+      <span className="brand-badge standalone-badge">CT</span>
+      <h1>Create Account</h1>
+      <p className="auth-intro">Start building shared playlists that survive platform boundaries.</p>
+
+      <form onSubmit={handleRegister}>
+        <div className="name-row">
+          <input
+            type="text"
+            name="firstName"
+            placeholder="First Name"
+            required
+            value={regFirstName}
+            onChange={(e) => setRegFirstName(e.target.value)}
+          />
+          <input
+            type="text"
+            name="lastName"
+            placeholder="Last Name"
+            required
+            value={regLastName}
+            onChange={(e) => setRegLastName(e.target.value)}
+          />
+        </div>
+
+        <input
+          type="email"
+          name="email"
+          placeholder="Email Address"
+          required
+          value={regEmail}
+          onChange={(e) => setRegEmail(e.target.value)}
+        />
+
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          required
+          value={regPassword}
+          onChange={(e) => setRegPassword(e.target.value)}
+        />
+
+        <input
+          type="password"
+          name="confirmPassword"
+          placeholder="Confirm Password"
+          required
+          value={regConfirmPassword}
+          onChange={(e) => setRegConfirmPassword(e.target.value)}
+        />
+
+        <button type="submit" className="btn-primary auth-submit">
+          Create CrossTunes Account
+        </button>
+
+        <p className="auth-switch">
+          Already have an account?{" "}
+          <a
+            href="#/login"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateTo("login");
+            }}
+          >
+            Log in →
+          </a>
+        </p>
+      </form>
+    </div>
+  </main>
+)}
+
     </>
   )
 }
