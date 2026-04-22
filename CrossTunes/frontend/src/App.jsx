@@ -429,6 +429,12 @@ function App() {
   const [userId, setUserId] = useState(null)
   const [loginError, setLoginError] = useState('')
   const [registerError, setRegisterError] = useState('')
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [registerFirstName, setRegisterFirstName] = useState('')
+  const [registerLastName, setRegisterLastName] = useState('')
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
 
   const addSongComment = (songId, comment) => {
     if (!comment || !comment.trim()) return
@@ -538,9 +544,13 @@ function App() {
 
   const handleLogin = async (event) => {
     event.preventDefault()
-    const formData = new FormData(event.target)
-    const email = formData.get('email')
-    const password = formData.get('password')
+    const email = loginEmail.trim()
+    const password = loginPassword
+
+    if (!email || !password) {
+      setLoginError('Please fill in all fields')
+      return
+    }
 
     try {
       const result = await login(email, password)
@@ -548,6 +558,8 @@ function App() {
       setUserName(result.username)
       setUserId(result.userId)
       setLoginError('')
+      setLoginEmail('')
+      setLoginPassword('')
       navigateTo('home')
     } catch (error) {
       setLoginError(error.message)
@@ -556,15 +568,23 @@ function App() {
 
   const handleRegister = async (event) => {
     event.preventDefault()
-    const formData = new FormData(event.target)
-    const email = formData.get('email')
-    const firstName = formData.get('firstName')
-    const lastName = formData.get('lastName')
-    const password = formData.get('password')
+    const email = registerEmail.trim()
+    const firstName = registerFirstName.trim()
+    const lastName = registerLastName.trim()
+    const password = registerPassword
+
+    if (!email || !firstName || !lastName || !password) {
+      setRegisterError('Please fill in all fields')
+      return
+    }
 
     try {
       await register(email, firstName, lastName, password)
       setRegisterError('')
+      setRegisterFirstName('')
+      setRegisterLastName('')
+      setRegisterEmail('')
+      setRegisterPassword('')
       // After successful registration, redirect to login
       navigateTo('login')
     } catch (error) {
@@ -577,6 +597,11 @@ function App() {
     setUserName('')
     setUserId(null)
     navigateTo('home')
+  }
+
+  const filterForbiddenChars = (value) => {
+    const forbidden = ['<', '>', '/', '=', "'", '"', '\\'];
+    return value.split('').filter(char => !forbidden.includes(char)).join('');
   }
 
   const handleRecommend = (event) => {
@@ -994,8 +1019,20 @@ function App() {
             <h1>Log In</h1>
             <p className="auth-intro">Pick up where your shared listening sessions left off.</p>
             <form onSubmit={handleLogin}>
-              <input type="email" name="email" placeholder="Email Address" required />
-              <input type="password" name="password" placeholder="Password" required />
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(filterForbiddenChars(e.target.value))}
+                placeholder="Email Address"
+                required
+              />
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(filterForbiddenChars(e.target.value))}
+                placeholder="Password"
+                required
+              />
               {loginError && <p className="auth-error">{loginError}</p>}
               <button type="submit" className="btn-primary auth-submit">
                 Enter CrossTunes
@@ -1095,11 +1132,35 @@ function App() {
             <p className="auth-intro">Start building shared playlists that survive platform boundaries.</p>
             <form onSubmit={handleRegister}>
               <div className="name-row">
-                <input type="text" name="firstName" placeholder="First Name" required />
-                <input type="text" name="lastName" placeholder="Last Name" required />
+                <input
+                  type="text"
+                  value={registerFirstName}
+                  onChange={(e) => setRegisterFirstName(filterForbiddenChars(e.target.value))}
+                  placeholder="First Name"
+                  required
+                />
+                <input
+                  type="text"
+                  value={registerLastName}
+                  onChange={(e) => setRegisterLastName(filterForbiddenChars(e.target.value))}
+                  placeholder="Last Name"
+                  required
+                />
               </div>
-              <input type="email" name="email" placeholder="Email Address" required />
-              <input type="password" name="password" placeholder="Password" required />
+              <input
+                type="email"
+                value={registerEmail}
+                onChange={(e) => setRegisterEmail(filterForbiddenChars(e.target.value))}
+                placeholder="Email Address"
+                required
+              />
+              <input
+                type="password"
+                value={registerPassword}
+                onChange={(e) => setRegisterPassword(filterForbiddenChars(e.target.value))}
+                placeholder="Password"
+                required
+              />
               <input type="password" placeholder="Confirm Password" required />
               {registerError && <p className="auth-error">{registerError}</p>}
               <button type="submit" className="btn-primary auth-submit">
