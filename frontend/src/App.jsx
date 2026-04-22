@@ -417,13 +417,16 @@ function App() {
   const [chatResult, setChatResult] = useState(null)
   const [isThinking, setIsThinking] = useState(false)
   const [chatHint, setChatHint] = useState('')
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [regFirstName, setRegFirstName] = useState("");
-  const [regLastName, setRegLastName] = useState("");
+
   const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [regUser, setRegUser] = useState("");
+  const [regPass, setRegPass] = useState("");
+
+  const [userId, setUserId] = useState(null); // this is your "session"
+
 
   const [songComments, setSongComments] = useState({
     1: ['Smooth drive anthem, this hits late night mode'],
@@ -547,38 +550,55 @@ function App() {
   const quickPrompts = ['Late Night Code playlist', 'Songs like Midnight Drive', 'Calm focus music']
 
   async function handleLogin(e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    const data = await loginUser(email, password);
+  try {
+    const res = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
 
-    if (data.error) {
-      alert(data.error);
-      return;
+    const data = await res.json();
+
+    if (data.userId) {
+      setUserId(data.userId);
+      navigateTo("home");
+    } else {
+      alert(data.error || "Login failed");
     }
-
-    localStorage.setItem("token", data.token);
-    navigateTo("home");
+  } catch (err) {
+    console.error(err);
+    alert("Network error");
   }
-  async function handleRegister(e) {
-    e.preventDefault();
-
-    if (regPassword !== regConfirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
-
-    const username = `${regFirstName} ${regLastName}`;
-
-    const data = await registerUser(regEmail, regPassword, username);
-
-    if (data.error) {
-      alert(data.error);
-      return;
-    }
-
-  localStorage.setItem("token", data.token);
-  navigateTo("home");
 }
+  async function handleRegister(e) {
+  e.preventDefault();
+
+  try {
+    const res = await fetch(`${API_URL}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: regEmail,
+        username: regUser,
+        password: regPass
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.message === "Registered") {
+      navigateTo("login");
+    } else {
+      alert(data.error || "Registration failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Network error");
+  }
+}
+
 
   return (
     <>
