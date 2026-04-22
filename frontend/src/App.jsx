@@ -426,6 +426,8 @@ function App() {
   const [regPass, setRegPass] = useState("");
 
   const [userId, setUserId] = useState(null); // this is your "session"
+  const API_URL = "http://localhost:3000"; // LOCAL TESTING
+
 
 
   const [songComments, setSongComments] = useState({
