@@ -17,19 +17,26 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Invalid characters in input. Characters < > / = ' \" \\ are not allowed." });
   }
 
-  const username = `${firstName} ${lastName}`;
-
   try {
     const hashed = await bcrypt.hash(password, 10);
 
     await pool.query(
-      "INSERT INTO users (email, username, password_hash) VALUES (?, ?, ?)",
-      [email, username, hashed]
+      "INSERT INTO users (email, firstName, lastName, password) VALUES (?, ?, ?, ?)",
+      [email, firstName, lastName, hashed]
     );
 
     res.json({ message: "User registered successfully" });
   } catch (err) {
-    console.log(err);
+    console.error(err);
+
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "An account with this email already exists" });
+    }
+
+    if (err.code === "ECONNREFUSED" || err.code === "PROTOCOL_CONNECTION_LOST") {
+      return res.status(503).json({ error: "Database unavailable. Start MySQL and try again." });
+    }
+
     res.status(500).json({ error: "Registration failed" });
   }
 });

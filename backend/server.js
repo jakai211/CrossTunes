@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 
 import registerRoute from "./routes/register.js";
 import loginRoute from "./routes/login.js";
+import musicRoute from "./routes/music.js";
+import spotifyAuthRoute from "./routes/spotifyAuth.js";
 
 dotenv.config();
 
@@ -16,6 +18,8 @@ app.use(express.json());
 // Routes
 app.use("/register", registerRoute);
 app.use("/login", loginRoute);
+app.use("/music", musicRoute);
+app.use("/auth", spotifyAuthRoute);
 
 // Test route
 app.get("/test", (req, res) => {

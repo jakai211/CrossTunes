@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import { registerUser, loginUser } from "./api/auth";
+import { registerUser, loginUser } from './api/auth'
+import { searchSongs } from './api/music'
+import { fetchSpotifyStatus, startSpotifyConnect } from './api/spotifyAuth'
 
 const featuredPlaylists = [
   {
@@ -262,6 +264,7 @@ function getRecommendations(query) {
 }
 
 const validPages = ['home', 'playlists', 'friends', 'login', 'register']
+const protectedPages = ['home', 'playlists', 'friends']
 
 function normalizeRoute(value) {
   return value
@@ -285,7 +288,60 @@ function getPageFromLocation() {
     return fromPath
   }
 
-  return 'home'
+  return 'login'
+}
+
+function normalizeFirstName(value) {
+  return String(value || '').trim()
+}
+
+function normalizeTrackText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getTrackTokens(value) {
+  return normalizeTrackText(value).split(' ').filter(Boolean)
+}
+
+function getPlaybackMatchScore(baseSong, candidateSong) {
+  if (!candidateSong || candidateSong.id === baseSong.id) return -1
+
+  const baseTitle = normalizeTrackText(baseSong.title)
+  const baseArtist = normalizeTrackText(baseSong.artist)
+  const candidateTitle = normalizeTrackText(candidateSong.title)
+  const candidateArtist = normalizeTrackText(candidateSong.artist)
+
+  let score = 0
+
+  if (baseTitle && candidateTitle) {
+    if (baseTitle === candidateTitle) score += 8
+    else if (baseTitle.includes(candidateTitle) || candidateTitle.includes(baseTitle)) score += 5
+
+    const baseTitleTokens = getTrackTokens(baseSong.title)
+    const candidateTitleTokens = new Set(getTrackTokens(candidateSong.title))
+    score += baseTitleTokens.filter((token) => candidateTitleTokens.has(token)).length
+  }
+
+  if (baseArtist && candidateArtist) {
+    if (baseArtist === candidateArtist) score += 6
+    else if (baseArtist.includes(candidateArtist) || candidateArtist.includes(baseArtist)) score += 4
+
+    const baseArtistTokens = getTrackTokens(baseSong.artist)
+    const candidateArtistTokens = new Set(getTrackTokens(candidateSong.artist))
+    score += baseArtistTokens.filter((token) => candidateArtistTokens.has(token)).length
+  }
+
+  if (candidateSong.previewUrl) score += 5
+  if (candidateSong.source === 'YouTube') score += 3
+  if (candidateSong.source === 'SoundCloud') score += 2
+
+  return score
 }
 
 function SourcePills({ sources }) {
@@ -303,8 +359,27 @@ function SourcePills({ sources }) {
   )
 }
 
-function SongCard({ song, index, comments = [], onAddComment, onRemoveComment }) {
+function SongCard({ song, index, comments = [], onAddComment, onRemoveComment, onPlay, isPlaying = false }) {
   const [draftComment, setDraftComment] = useState('')
+
+  const handleCardPlay = (event) => {
+    if (event.target.closest('button, input, form, a')) {
+      return
+    }
+
+    onPlay(song)
+  }
+
+  const handleCardKeyDown = (event) => {
+    if (event.target.closest('button, input, form, a')) {
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onPlay(song)
+    }
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -315,7 +390,14 @@ function SongCard({ song, index, comments = [], onAddComment, onRemoveComment })
   }
 
   return (
-    <article className="song-card">
+    <article
+      className={`song-card ${isPlaying ? 'song-card--playing' : ''}`}
+      onClick={handleCardPlay}
+      onKeyDown={handleCardKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Play ${song.title} by ${song.artist}`}
+    >
       <div className="song-card-rank" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
       <div className="song-card-art" aria-hidden="true">
         <span className="song-art-inner"></span>
@@ -327,15 +409,20 @@ function SongCard({ song, index, comments = [], onAddComment, onRemoveComment })
       </div>
       <div className="song-card-meta">
         <span className={`song-source-badge ${song.source.toLowerCase()}`}>
-          {sourceMarks[song.source]}
+          {sourceMarks[song.source] || song.source.slice(0, 2).toUpperCase()}
         </span>
         <span className="song-mood-tag">{song.mood}</span>
       </div>
       <div className="song-card-right">
         <span className="song-plays">{song.plays}</span>
         <span className="song-duration">{song.duration}</span>
-        <button type="button" className="song-play-btn" aria-label={`Play ${song.title}`}>
-          &#9654;
+        <button
+          type="button"
+          className={`song-play-btn ${isPlaying ? 'is-playing' : ''}`}
+          onClick={() => onPlay(song)}
+          aria-label={`${isPlaying ? 'Pause' : 'Play'} ${song.title}`}
+        >
+          {isPlaying ? '❚❚' : '▶'}
         </button>
       </div>
 
@@ -417,16 +504,32 @@ function App() {
   const [chatResult, setChatResult] = useState(null)
   const [isThinking, setIsThinking] = useState(false)
   const [chatHint, setChatHint] = useState('')
+  const [songSearchResults, setSongSearchResults] = useState([])
+  const [songSearchError, setSongSearchError] = useState('')
+  const [songSearchUnavailableSources, setSongSearchUnavailableSources] = useState([])
+  const [isSongSearchLoading, setIsSongSearchLoading] = useState(false)
+  const [currentPlayingSongId, setCurrentPlayingSongId] = useState(null)
+  const [activePlayer, setActivePlayer] = useState(null)
+  const audioRef = useRef(null)
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [regEmail, setRegEmail] = useState("");
-  const [regUser, setRegUser] = useState("");
-  const [regPass, setRegPass] = useState("");
+  const [regFirstName, setRegFirstName] = useState("");
+  const [regLastName, setRegLastName] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
 
-  const [userId, setUserId] = useState(null); // this is your "session"
-  const API_URL = "http://localhost:3000"; // LOCAL TESTING
+  const [userId, setUserId] = useState(() => {
+    const stored = window.localStorage.getItem('ct_user_id')
+    if (!stored) return null
+    const parsed = Number.parseInt(stored, 10)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  })
+  const [userFirstName, setUserFirstName] = useState(() => normalizeFirstName(window.localStorage.getItem('ct_user_first_name')))
+  const [spotifyConnected, setSpotifyConnected] = useState(false)
+  const [spotifyStatusText, setSpotifyStatusText] = useState('Sign in and connect Spotify to enable account playback features.')
 
 
 
@@ -456,32 +559,263 @@ function App() {
     })
   }
 
+  const getEmbedUrl = (song) => {
+    if (!song?.trackUrl) return null
+
+    if (song.source === 'Spotify') {
+      const match = song.trackUrl.match(/track\/([a-zA-Z0-9]+)/)
+      return match ? `https://open.spotify.com/embed/track/${match[1]}` : null
+    }
+
+    if (song.source === 'YouTube') {
+      try {
+        const parsedUrl = new URL(song.trackUrl)
+        const videoId = parsedUrl.searchParams.get('v')
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`
+        }
+      } catch {
+        return null
+      }
+      return null
+    }
+
+    if (song.source === 'SoundCloud') {
+      return `https://w.soundcloud.com/player/?url=${encodeURIComponent(song.trackUrl)}&auto_play=true`
+    }
+
+    return null
+  }
+
+  const getPlaybackCandidates = (song) => [song, ...songSearchResults, ...trendingSongs]
+
+  const getFullPlaybackEntry = (song) => {
+    const sourceBonus = {
+      YouTube: 8,
+      SoundCloud: 6,
+      Spotify: 3,
+    }
+
+    return getPlaybackCandidates(song)
+      .map((candidate) => {
+        const embedUrl = getEmbedUrl(candidate)
+        if (!embedUrl) return null
+
+        const matchScore = candidate.id === song.id ? 18 : getPlaybackMatchScore(song, candidate)
+        const score = matchScore + (sourceBonus[candidate.source] || 0)
+        if (score < 6) return null
+
+        return { candidate, embedUrl, score }
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score)[0] || null
+  }
+
+  const getPreviewPlaybackEntry = (song) => {
+    return getPlaybackCandidates(song)
+      .map((candidate) => {
+        if (!candidate.previewUrl) return null
+
+        const score = candidate.id === song.id ? 18 : getPlaybackMatchScore(song, candidate)
+        if (score < 6) return null
+
+        return { candidate, score }
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score)[0] || null
+  }
+
+  const getPlaybackNote = (requestedSong, playbackSong, mode) => {
+    if (!playbackSong) return ''
+
+    if (mode === 'embed') {
+      if (requestedSong.source !== playbackSong.source) {
+        return `Full track matched from ${playbackSong.source} for this song.`
+      }
+
+      return `Full playback via ${playbackSong.source}.`
+    }
+
+    if (requestedSong.source !== playbackSong.source) {
+      return `Preview matched from ${playbackSong.source} while a full track was not available.`
+    }
+
+    return `Preview playback from ${playbackSong.source}.`
+  }
+
+  const closeActivePlayer = () => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    setCurrentPlayingSongId(null)
+    setActivePlayer(null)
+  }
+
+  const handlePlaySong = async (song) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (activePlayer?.type === 'embed' && activePlayer.requestedSongId === song.id) {
+      closeActivePlayer()
+      return
+    }
+
+    const fullPlaybackEntry = getFullPlaybackEntry(song)
+    if (fullPlaybackEntry) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      setCurrentPlayingSongId(song.id)
+      setActivePlayer({
+        type: 'embed',
+        title: song.title,
+        artist: song.artist,
+        source: fullPlaybackEntry.candidate.source,
+        embedUrl: fullPlaybackEntry.embedUrl,
+        requestedSongId: song.id,
+        note: getPlaybackNote(song, fullPlaybackEntry.candidate, 'embed'),
+      })
+      return
+    }
+
+    const previewPlaybackEntry = getPreviewPlaybackEntry(song)
+    const previewSong = previewPlaybackEntry?.candidate || song
+
+    if (previewSong.previewUrl) {
+      setActivePlayer({
+        type: 'preview',
+        title: song.title,
+        artist: song.artist,
+        source: previewSong.source,
+        requestedSongId: song.id,
+        note: getPlaybackNote(song, previewSong, 'preview'),
+      })
+
+      if (currentPlayingSongId === song.id && !audio.paused) {
+        audio.pause()
+        setCurrentPlayingSongId(null)
+        setActivePlayer(null)
+        return
+      }
+
+      try {
+        audio.src = previewSong.previewUrl
+        await audio.play()
+        setCurrentPlayingSongId(song.id)
+      } catch {
+        setActivePlayer({
+          type: 'unavailable',
+          title: song.title,
+          artist: song.artist,
+          source: previewSong.source,
+          requestedSongId: song.id,
+          note: 'Playback not available for this track in CrossTunes.',
+        })
+      }
+      return
+    }
+
+    setActivePlayer({
+      type: 'unavailable',
+      title: song.title,
+      artist: song.artist,
+      source: song.source || 'Unknown',
+      requestedSongId: song.id,
+      note: 'Playback not available for this track in CrossTunes.',
+    })
+  }
+
   const navigateTo = (page) => {
     if (!validPages.includes(page)) {
       return
     }
-    const targetHash = `#/${page}`
+    const targetPage = !userId && protectedPages.includes(page) ? 'login' : page
+    const targetHash = `#/${targetPage}`
     if (window.location.hash !== targetHash) {
       window.location.hash = targetHash
     }
-    setCurrentPage(page)
+    setCurrentPage(targetPage)
   }
 
   useEffect(() => {
-    const initialPage = getPageFromLocation()
-    setCurrentPage(initialPage)
+    const pageFromHash = getPageFromLocation()
+    const initialPage = !userId && protectedPages.includes(pageFromHash) ? 'login' : pageFromHash
 
     if (!window.location.hash || !validPages.includes(normalizeRoute(window.location.hash))) {
       window.location.hash = `/${initialPage}`
     }
 
     const onHashChange = () => {
-      setCurrentPage(getPageFromLocation())
+      const nextPage = getPageFromLocation()
+      if (!userId && protectedPages.includes(nextPage)) {
+        window.location.hash = '/login'
+        setCurrentPage('login')
+        return
+      }
+
+      setCurrentPage(nextPage)
     }
 
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
-  }, [])
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      window.localStorage.removeItem('ct_user_id')
+      window.localStorage.removeItem('ct_user_first_name')
+      return
+    }
+
+    window.localStorage.setItem('ct_user_id', String(userId))
+    window.localStorage.setItem('ct_user_first_name', userFirstName)
+  }, [userFirstName, userId])
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      const search = new URLSearchParams(window.location.hash.split('?')[1] || '')
+      const spotifyResult = search.get('spotify')
+
+      if (spotifyResult === 'connected') {
+        setSpotifyStatusText('Spotify account connected.')
+      }
+
+      if (spotifyResult === 'error') {
+        const reason = search.get('reason') || 'unknown_error'
+        setSpotifyStatusText(`Spotify connect failed: ${reason}`)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
+  }, [currentPage])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadSpotifyStatus = async () => {
+      if (!userId) return
+
+      const status = await fetchSpotifyStatus(userId)
+      if (cancelled) return
+
+      if (status.error) {
+        setSpotifyConnected(false)
+        setSpotifyStatusText(status.error)
+        return
+      }
+
+      setSpotifyConnected(status.connected)
+      setSpotifyStatusText(status.connected ? 'Spotify is linked to your Crosstunes account.' : 'Spotify not connected yet.')
+    }
+
+    loadSpotifyStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const togglePlatform = (platform) => {
     setActivePlatforms((currentPlatforms) => {
@@ -510,9 +844,6 @@ function App() {
     return matchesSearch && matchesPlatform
   })
 
-  const hubPreview = filteredPlaylists.slice(0, 3)
-  const searchableSources = new Set(filteredPlaylists.flatMap((playlist) => playlist.sources))
-
   const filteredMyPlaylists = myPlaylists
     .filter((pl) => playlistPlatform === 'All' || pl.sources.includes(playlistPlatform))
     .sort((a, b) => {
@@ -520,6 +851,25 @@ function App() {
       if (playlistSort === 'tracks') return b.tracks - a.tracks
       return 0
     })
+
+  useEffect(() => {
+    const query = searchQuery.trim()
+
+    if (query.length < 2) {
+      return
+    }
+
+    const timerId = window.setTimeout(async () => {
+      setIsSongSearchLoading(true)
+      const result = await searchSongs(query, activePlatforms, 6)
+      setSongSearchResults(result.songs)
+      setSongSearchError(result.error || '')
+      setSongSearchUnavailableSources(result.unavailableSources || [])
+      setIsSongSearchLoading(false)
+    }, 350)
+
+    return () => window.clearTimeout(timerId)
+  }, [searchQuery, activePlatforms])
 
   const handleCreatePlaylist = (event) => {
     event.preventDefault()
@@ -555,16 +905,11 @@ function App() {
   e.preventDefault();
 
   try {
-    const res = await fetch(`${API_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await res.json();
+    const data = await loginUser(email, password)
 
     if (data.userId) {
       setUserId(data.userId);
+      setUserFirstName(normalizeFirstName(data.firstName));
       navigateTo("home");
     } else {
       alert(data.error || "Login failed");
@@ -577,20 +922,20 @@ function App() {
   async function handleRegister(e) {
   e.preventDefault();
 
+  if (regPassword !== regConfirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
+
   try {
-    const res = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: regEmail,
-        username: regUser,
-        password: regPass
-      })
-    });
+    const data = await registerUser(regEmail, regFirstName, regLastName, regPassword)
 
-    const data = await res.json();
-
-    if (data.message === "Registered") {
+    if (data.message === "User registered successfully") {
+      setRegEmail("");
+      setRegFirstName("");
+      setRegLastName("");
+      setRegPassword("");
+      setRegConfirmPassword("");
       navigateTo("login");
     } else {
       alert(data.error || "Registration failed");
@@ -600,6 +945,19 @@ function App() {
     alert("Network error");
   }
 }
+
+  function handleLogout() {
+    setUserId(null)
+    setUserFirstName('')
+    setEmail('')
+    setPassword('')
+    setSpotifyConnected(false)
+    setSpotifyStatusText('Sign in and connect Spotify to enable account playback features.')
+    closeActivePlayer()
+    navigateTo('login')
+  }
+
+  const showSignedInNav = Boolean(userId) && currentPage !== 'login' && currentPage !== 'register'
 
 
   return (
@@ -655,26 +1013,43 @@ function App() {
         </div>
 
         <div className="nav-secondary">
-          <a
-            href="#/login"
-            className={`nav-utility ${currentPage === 'login' ? 'active' : ''}`}
-            onClick={(event) => {
-              event.preventDefault()
-              navigateTo('login')
-            }}
-          >
-            Log In
-          </a>
-          <a
-            href="#/register"
-            className={`nav-signup ${currentPage === 'register' ? 'nav-signup--active' : ''}`}
-            onClick={(event) => {
-              event.preventDefault()
-              navigateTo('register')
-            }}
-          >
-            Create Account
-          </a>
+          {showSignedInNav ? (
+            <>
+              <div className="nav-greeting" aria-live="polite">
+                Welcome, {userFirstName || 'there'}
+              </div>
+              <button
+                type="button"
+                className="nav-utility nav-logout"
+                onClick={handleLogout}
+              >
+                Log Out
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="#/login"
+                className={`nav-utility ${currentPage === 'login' ? 'active' : ''}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  navigateTo('login')
+                }}
+              >
+                Log In
+              </a>
+              <a
+                href="#/register"
+                className={`nav-signup ${currentPage === 'register' ? 'nav-signup--active' : ''}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  navigateTo('register')
+                }}
+              >
+                Create Account
+              </a>
+            </>
+          )}
         </div>
       </nav>
       </header>
@@ -685,8 +1060,12 @@ function App() {
           {/* ── Hero ── */}
           <section className="hub-hero">
             <p className="eyebrow">CrossTunes</p>
-            <h1>One search. Every platform.</h1>
-            <p className="hero-summary">Find and share music across Spotify, YouTube, and SoundCloud in one place.</p>
+            <h1>{userFirstName ? `Welcome, ${userFirstName}.` : 'One search. Every platform.'}</h1>
+            <p className="hero-summary">
+              {userFirstName
+                ? `Signed in and ready to explore tracks across Spotify, YouTube, and SoundCloud.`
+                : 'Find and share music across Spotify, YouTube, and SoundCloud in one place.'}
+            </p>
 
             <div className="hero-stats">
               <span><strong>{trendingSongs.length}</strong> trending tracks</span>
@@ -756,6 +1135,49 @@ function App() {
             </section>
           )}
 
+          {normalizedSearch.length > 1 && (
+            <section className="hub-section">
+              <h2 className="hub-section-title">Live Song Search</h2>
+              {isSongSearchLoading && <p className="search-no-results">Searching songs...</p>}
+              {!isSongSearchLoading && songSearchError && <p className="search-no-results">{songSearchError}</p>}
+              {!isSongSearchLoading && !songSearchError && songSearchUnavailableSources.length > 0 && (
+                <p className="search-no-results">
+                  Some sources are unavailable: {songSearchUnavailableSources.join(', ')}
+                </p>
+              )}
+              {!isSongSearchLoading && !songSearchError && songSearchResults.length === 0 && (
+                <p className="search-no-results">No song results found.</p>
+              )}
+              {!isSongSearchLoading && !songSearchError && songSearchResults.length > 0 && (
+                <div className="song-grid">
+                  {songSearchResults.map((song, i) => (
+                    <SongCard
+                      key={`${song.id}-${i}`}
+                      song={{
+                        id: song.id,
+                        title: song.title,
+                        artist: song.artist,
+                        album: song.album,
+                        duration: song.duration,
+                        mood: song.genre,
+                        source: song.source,
+                        plays: 'Live',
+                        previewUrl: song.previewUrl,
+                        trackUrl: song.trackUrl,
+                      }}
+                      index={i}
+                      comments={songComments[song.id] || []}
+                      onAddComment={addSongComment}
+                      onRemoveComment={removeSongComment}
+                      onPlay={handlePlaySong}
+                      isPlaying={currentPlayingSongId === song.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* ── Section jump tabs ── */}
           <nav className="section-tabs" aria-label="Jump to section">
             <a href="#trending" className="section-tab">Trending</a>
@@ -775,6 +1197,8 @@ function App() {
                   comments={songComments[song.id] || []}
                   onAddComment={addSongComment}
                   onRemoveComment={removeSongComment}
+                  onPlay={handlePlaySong}
+                  isPlaying={currentPlayingSongId === song.id}
                 />
               ))}
             </div>
@@ -811,14 +1235,31 @@ function App() {
               <h1>Your shelves &amp; work-in-progress mixes.</h1>
               <p className="pl-header-sub">Keep your core listening stacks close while the hub handles discovery.</p>
             </div>
-            <button
-              type="button"
-              className="btn-primary pl-new-btn"
-              onClick={() => setIsCreatingPlaylist(true)}
-            >
-              + New Playlist
-            </button>
+            <div className="pl-header-actions">
+              <button
+                type="button"
+                className={`pl-spotify-connect ${spotifyConnected ? 'connected' : ''}`}
+                onClick={() => {
+                  if (!userId) {
+                    alert('Please log in first to connect Spotify.')
+                    return
+                  }
+                  startSpotifyConnect(userId)
+                }}
+              >
+                {spotifyConnected ? 'Spotify Connected' : 'Connect Spotify'}
+              </button>
+              <button
+                type="button"
+                className="btn-primary pl-new-btn"
+                onClick={() => setIsCreatingPlaylist(true)}
+              >
+                + New Playlist
+              </button>
+            </div>
           </div>
+
+          <p className="pl-spotify-status">{spotifyStatusText}</p>
 
           <div className="pl-controls-row">
             <div className="pl-filter-row" role="group" aria-label="Filter by platform">
@@ -1022,6 +1463,7 @@ function App() {
 
 
 
+      {(currentPage === 'home' || currentPage === 'playlists') && (
       <aside className="dj-widget-wrap" aria-label="CrossFade DJ recommender">
         <button
           type="button"
@@ -1102,6 +1544,50 @@ function App() {
           </div>
         )}
       </aside>
+      )}
+
+      {activePlayer && (
+        <section className="site-player-dock" aria-label="Now playing">
+          <div className="site-player-head">
+            <div>
+              <p className="site-player-kicker">Now Playing on {activePlayer.source || 'CrossTunes'}</p>
+              <h3>{activePlayer.title}</h3>
+              <p>{activePlayer.artist}</p>
+              {activePlayer.note ? <p className="site-player-note">{activePlayer.note}</p> : null}
+            </div>
+            <button type="button" className="site-player-close" onClick={closeActivePlayer} aria-label="Close player">✕</button>
+          </div>
+
+          {activePlayer.type === 'embed' && activePlayer.embedUrl && (
+            <iframe
+              className="site-player-embed"
+              src={activePlayer.embedUrl}
+              title={`${activePlayer.title} player`}
+              allow="autoplay; encrypted-media; clipboard-write; fullscreen"
+              loading="lazy"
+            />
+          )}
+
+          {activePlayer.type === 'unavailable' && (
+            <div className="site-player-unavailable">
+              <p>This track is not available for playback in CrossTunes. Try searching for an alternative version across platforms.</p>
+            </div>
+          )}
+        </section>
+      )}
+
+      <audio
+        ref={audioRef}
+        className={activePlayer?.type === 'preview' ? 'site-player-audio site-player-audio--active' : 'site-player-audio'}
+        controls
+        onEnded={() => setCurrentPlayingSongId(null)}
+        onPause={() => {
+          if (audioRef.current?.ended) return
+          if (audioRef.current?.currentTime === 0) return
+          setCurrentPlayingSongId(null)
+          if (activePlayer?.type === 'preview') setActivePlayer(null)
+        }}
+      />
 
       {currentPage === 'register' && (
   <main className="container auth-page">

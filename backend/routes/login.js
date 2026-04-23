@@ -28,15 +28,24 @@ router.post("/", async (req, res) => {
     }
 
     const user = rows[0];
-    const match = await bcrypt.compare(password, user.password_hash);
+    const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
       return res.status(400).json({ error: "Incorrect password" });
     }
 
-    res.json({ message: "Login successful", userId: user.id, username: user.username });
+    res.json({
+      message: "Login successful",
+      userId: user.id,
+      firstName: user.firstName || "",
+    });
   } catch (err) {
     console.log(err);
+
+    if (err.code === "ECONNREFUSED" || err.code === "PROTOCOL_CONNECTION_LOST") {
+      return res.status(503).json({ error: "Database unavailable. Start MySQL and try again." });
+    }
+
     res.status(500).json({ error: "Login failed" });
   }
 });
