@@ -1,6 +1,7 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import pool from "../db/pool.js";
+import Logger from "../logger.js";
 
 const router = express.Router();
 
@@ -30,13 +31,16 @@ router.post("/", async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {
+      Logger.logLogin(normalizedEmail, user.id, user.firstName || "", false);
       return res.status(400).json({ error: "Incorrect password" });
     }
 
+    Logger.logLogin(normalizedEmail, user.id, user.firstName || "", true);
     res.json({
       message: "Login successful",
       userId: user.id,
       firstName: user.firstName || "",
+    Logger.logError("Login error", err);
     });
   } catch (err) {
     console.log(err);

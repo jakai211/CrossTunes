@@ -1,5 +1,6 @@
 <?php
  require_once('database.php');
+ require_once('logger.php');
  $emailAddress = filter_input(INPUT_POST, 'email_address', FILTER_VALIDATE_EMAIL);
  $password = $_POST['password'] ?? '';
  if($emailAddress){
@@ -15,14 +16,17 @@
  $db->close();
  $name = "$firstName $lastName";
  if ($fetched && isset($name)) {
+   logLogin($emailAddress, $name, true);
    session_regenerate_id(true);
    $_SESSION['login'] = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
    header("Location: index.php");
    exit;
  } else {
+   logLogin($emailAddress, '', false);
    echo "<h2>Sorry, login incorrect</h2>\n";
    echo "<a href=\"index.php\">Please try again</a>\n";
 } } else{
+  logError("Invalid email address provided", $emailAddress);
   echo "<h2>Please log in with a valid email address.</h2>\n";
   echo '<a href="index.php">Please try again</a>';
 }
