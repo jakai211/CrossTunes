@@ -295,6 +295,37 @@ function normalizeFirstName(value) {
   return String(value || '').trim()
 }
 
+function getPasswordStrength(password) {
+  const value = String(password || '')
+  const hasLower = /[a-z]/.test(value)
+  const hasUpper = /[A-Z]/.test(value)
+  const hasNumber = /\d/.test(value)
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>[\]\\/~`_\-+=;]/.test(value)
+  const hasMinLength = value.length >= 8
+  const hasBonusLength = value.length >= 12
+
+  let score = 0
+  if (hasMinLength) score += 1
+  if (hasLower) score += 1
+  if (hasUpper) score += 1
+  if (hasNumber) score += 1
+  if (hasSpecial) score += 1
+  if (hasBonusLength) score += 1
+
+  const levels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent']
+  const tones = ['very-weak', 'weak', 'fair', 'good', 'strong', 'excellent']
+  const index = Math.min(Math.max(score - 1, 0), levels.length - 1)
+
+  return {
+    score,
+    label: levels[index],
+    tone: tones[index],
+    percent: Math.max(10, Math.round((score / 6) * 100)),
+    hasMinLength,
+    hasSpecial,
+  }
+}
+
 function normalizeTrackText(value) {
   return String(value || '')
     .toLowerCase()
@@ -530,6 +561,8 @@ function App() {
   const [userFirstName, setUserFirstName] = useState(() => normalizeFirstName(window.localStorage.getItem('ct_user_first_name')))
   const [spotifyConnected, setSpotifyConnected] = useState(false)
   const [spotifyStatusText, setSpotifyStatusText] = useState('Sign in and connect Spotify to enable account playback features.')
+
+  const passwordStrength = getPasswordStrength(regPassword)
 
 
 
@@ -921,6 +954,16 @@ function App() {
 }
   async function handleRegister(e) {
   e.preventDefault();
+
+  if (!passwordStrength.hasMinLength) {
+    alert("Password must be at least 8 characters long");
+    return;
+  }
+
+  if (!passwordStrength.hasSpecial) {
+    alert("Password must include at least one special character");
+    return;
+  }
 
   if (regPassword !== regConfirmPassword) {
     alert("Passwords do not match");
@@ -1633,6 +1676,22 @@ function App() {
           value={regPassword}
           onChange={(e) => setRegPassword(e.target.value)}
         />
+
+        <div className="password-meter" aria-live="polite">
+          <div className="password-meter-track" role="presentation">
+            <span
+              className={`password-meter-fill ${passwordStrength.tone}`}
+              style={{ width: `${passwordStrength.percent}%` }}
+            ></span>
+          </div>
+          <p className="password-meter-label">Strength: {passwordStrength.label}</p>
+          <p className={`password-rule ${passwordStrength.hasMinLength ? 'ok' : 'missing'}`}>
+            At least 8 characters
+          </p>
+          <p className={`password-rule ${passwordStrength.hasSpecial ? 'ok' : 'missing'}`}>
+            At least 1 special character (! @ # $ % etc.)
+          </p>
+        </div>
 
         <input
           type="password"

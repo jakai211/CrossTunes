@@ -11,16 +11,15 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Missing fields" });
   }
 
-  // Check for forbidden characters
-  const forbiddenChars = /[<>\ /=\\'"]/;
-  if (forbiddenChars.test(email) || forbiddenChars.test(password)) {
-    return res.status(400).json({ error: "Invalid characters in input. Characters < > / = ' \" \\ are not allowed." });
+  const normalizedEmail = String(email).trim();
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Invalid email format" });
   }
 
   try {
     const [rows] = await pool.query(
       "SELECT * FROM users WHERE email = ?",
-      [email]
+      [normalizedEmail]
     );
 
     if (rows.length === 0) {

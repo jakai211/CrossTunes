@@ -11,10 +11,23 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Missing fields" });
   }
 
-  // Check for forbidden characters
-  const forbiddenChars = /[<>\ /=\\'"]/;
-  if (forbiddenChars.test(email) || forbiddenChars.test(firstName) || forbiddenChars.test(lastName) || forbiddenChars.test(password)) {
-    return res.status(400).json({ error: "Invalid characters in input. Characters < > / = ' \" \\ are not allowed." });
+  // Keep basic sanitization for profile fields, but allow strong password symbols.
+  const forbiddenProfileChars = /[<>\\/='"]/;
+  if (forbiddenProfileChars.test(firstName) || forbiddenProfileChars.test(lastName)) {
+    return res.status(400).json({ error: "Invalid characters in name fields." });
+  }
+
+  const normalizedEmail = String(email).trim();
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters long" });
+  }
+
+  if (!/[!@#$%^&*(),.?\":{}|<>[\]\\/~`_\-+=;]/.test(String(password))) {
+    return res.status(400).json({ error: "Password must include at least one special character" });
   }
 
   try {
@@ -22,7 +35,7 @@ router.post("/", async (req, res) => {
 
     await pool.query(
       "INSERT INTO users (email, firstName, lastName, password) VALUES (?, ?, ?, ?)",
-      [email, firstName, lastName, hashed]
+      [normalizedEmail, firstName, lastName, hashed]
     );
 
     res.json({ message: "User registered successfully" });

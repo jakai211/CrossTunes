@@ -1790,6 +1790,71 @@
 
 .auth-card input::placeholder { color: rgba(237, 228, 249, 0.38); }
 
+.password-meter {
+  display: grid;
+  gap: 6px;
+  margin-top: -4px;
+  margin-bottom: 2px;
+}
+
+.password-meter-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.password-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 180ms ease, background-color 180ms ease;
+}
+
+.password-meter-fill.very-weak {
+  background: #ef4444;
+}
+
+.password-meter-fill.weak {
+  background: #f97316;
+}
+
+.password-meter-fill.fair {
+  background: #f59e0b;
+}
+
+.password-meter-fill.good {
+  background: #84cc16;
+}
+
+.password-meter-fill.strong {
+  background: #22c55e;
+}
+
+.password-meter-fill.excellent {
+  background: #14b8a6;
+}
+
+.password-meter-label {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.password-rule {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.password-rule.ok {
+  color: #9cffc1;
+}
+
+.password-rule.missing {
+  color: #ffb3b3;
+}
+
 .name-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
