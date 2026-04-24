@@ -17,6 +17,12 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Invalid email format" });
   }
 
+  // Check for forbidden characters in email and password
+  const forbiddenChars = /[<>\\/='"\|\[\]{}~`]/;
+  if (forbiddenChars.test(normalizedEmail) || forbiddenChars.test(String(password))) {
+    return res.status(400).json({ error: "Invalid characters in input fields." });
+  }
+
   try {
     const user = await findUserByEmail(normalizedEmail);
 

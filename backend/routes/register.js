@@ -12,7 +12,7 @@ router.post("/", async (req, res) => {
   }
 
   // Keep basic sanitization for profile fields, but allow strong password symbols.
-  const forbiddenProfileChars = /[<>\\/='"]/;
+  const forbiddenProfileChars = /[<>\\/='"\|\[\]{}~`]/;
   if (forbiddenProfileChars.test(firstName) || forbiddenProfileChars.test(lastName)) {
     return res.status(400).json({ error: "Invalid characters in name fields." });
   }
@@ -22,10 +22,20 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Invalid email format" });
   }
 
+  // Check for forbidden characters in email
+  const forbiddenChars = /[<>\\/='"\|\[\]{}~`]/;
+  if (forbiddenChars.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Invalid characters in email." });
+  }
+
   if (String(password).length < 8) {
     return res.status(400).json({ error: "Password must be at least 8 characters long" });
   }
-
+  // Check for forbidden characters in password
+  const forbiddenChars = /[<>\\/='"\|\[\]{}~`]/;
+  if (forbiddenChars.test(String(password))) {
+    return res.status(400).json({ error: "Invalid characters in password." });
+  }
   if (!/[!@#$%^&*(),.?\":{}|<>[\]\\/~`_\-+=;]/.test(String(password))) {
     return res.status(400).json({ error: "Password must include at least one special character" });
   }

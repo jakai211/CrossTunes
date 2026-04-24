@@ -326,6 +326,11 @@ function getPasswordStrength(password) {
   }
 }
 
+function filterForbiddenChars(value) {
+  const forbidden = ['\\', '|', '/', '<', '>', '=', "'", '"'];
+  return value.split('').filter(char => !forbidden.includes(char)).join('');
+}
+
 function normalizeTrackText(value) {
   return String(value || '')
     .toLowerCase()
@@ -1471,7 +1476,7 @@ function App() {
           placeholder="Email Address"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setEmail(filterForbiddenChars(e.target.value))}
         />
 
         <input
@@ -1480,7 +1485,7 @@ function App() {
           placeholder="Password"
           required
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => setPassword(filterForbiddenChars(e.target.value))}
         />
 
         <button type="submit" className="btn-primary auth-submit">
@@ -1647,7 +1652,7 @@ function App() {
             placeholder="First Name"
             required
             value={regFirstName}
-            onChange={(e) => setRegFirstName(e.target.value)}
+            onChange={(e) => setRegFirstName(filterForbiddenChars(e.target.value))}
           />
           <input
             type="text"
@@ -1655,7 +1660,7 @@ function App() {
             placeholder="Last Name"
             required
             value={regLastName}
-            onChange={(e) => setRegLastName(e.target.value)}
+            onChange={(e) => setRegLastName(filterForbiddenChars(e.target.value))}
           />
         </div>
 
@@ -1665,7 +1670,7 @@ function App() {
           placeholder="Email Address"
           required
           value={regEmail}
-          onChange={(e) => setRegEmail(e.target.value)}
+          onChange={(e) => setRegEmail(filterForbiddenChars(e.target.value))}
         />
 
         <input
@@ -1674,7 +1679,7 @@ function App() {
           placeholder="Password"
           required
           value={regPassword}
-          onChange={(e) => setRegPassword(e.target.value)}
+          onChange={(e) => setRegPassword(filterForbiddenChars(e.target.value))}
         />
 
         <div className="password-meter" aria-live="polite">
@@ -1699,7 +1704,7 @@ function App() {
           placeholder="Confirm Password"
           required
           value={regConfirmPassword}
-          onChange={(e) => setRegConfirmPassword(e.target.value)}
+          onChange={(e) => setRegConfirmPassword(filterForbiddenChars(e.target.value))}
         />
 
         <button type="submit" className="btn-primary auth-submit">
