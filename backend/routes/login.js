@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcrypt";
-import pool from "../db/pool.js";
+import { findUserByEmail } from "../db/users.js";
 import Logger from "../logger.js";
 
 const router = express.Router();
@@ -18,16 +18,11 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query(
-      "SELECT * FROM users WHERE email = ?",
-      [normalizedEmail]
-    );
+    const user = await findUserByEmail(normalizedEmail);
 
-    if (rows.length === 0) {
+    if (!user) {
       return res.status(400).json({ error: "User not found" });
     }
-
-    const user = rows[0];
     const match = await bcrypt.compare(password, user.password);
 
     if (!match) {

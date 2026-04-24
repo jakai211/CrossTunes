@@ -1,6 +1,6 @@
 import express from "express";
 import bcrypt from "bcrypt";
-import pool from "../db/pool.js";
+import { createUser } from "../db/users.js";
 
 const router = express.Router();
 
@@ -33,10 +33,12 @@ router.post("/", async (req, res) => {
   try {
     const hashed = await bcrypt.hash(password, 10);
 
-    await pool.query(
-      "INSERT INTO users (email, firstName, lastName, password) VALUES (?, ?, ?, ?)",
-      [normalizedEmail, firstName, lastName, hashed]
-    );
+    await createUser({
+      email: normalizedEmail,
+      firstName,
+      lastName,
+      password: hashed,
+    });
 
     res.json({ message: "User registered successfully" });
   } catch (err) {

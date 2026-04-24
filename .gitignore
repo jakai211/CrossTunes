@@ -1,3 +1,5 @@
 node_modules/
 **/node_modules/
 backend/.mysql-data/
+backend/.mysql-runtime-data/
+backend/.local-data/

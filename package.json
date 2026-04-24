@@ -1,0 +1,9 @@
+{
+  "name": "crosstunes",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "backend:start": "npm --prefix backend start"
+  }
+}

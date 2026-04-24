@@ -1,4 +1,11 @@
 import pool from "./pool.js";
+import { readCollection, writeCollection } from "./localStore.js";
+
+const tokensFile = "oauthTokens.json";
+
+function isFallbackError(err) {
+  return err?.code === "ECONNREFUSED" || err?.code === "PROTOCOL_CONNECTION_LOST" || err?.code === "ER_NO_SUCH_TABLE";
+}
 
 export async function ensureOAuthTokenTable() {
   await pool.query(`
@@ -27,46 +34,93 @@ export async function upsertSpotifyToken({
   scope,
   expiresAt,
 }) {
-  await ensureOAuthTokenTable();
+  try {
+    await ensureOAuthTokenTable();
 
-  await pool.query(
-    `
-      INSERT INTO user_oauth_tokens
-        (user_id, provider, access_token, refresh_token, token_type, scope, expires_at)
-      VALUES (?, 'spotify', ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        access_token = VALUES(access_token),
-        refresh_token = VALUES(refresh_token),
-        token_type = VALUES(token_type),
-        scope = VALUES(scope),
-        expires_at = VALUES(expires_at)
-    `,
-    [userId, accessToken, refreshToken, tokenType, scope, expiresAt]
-  );
+    await pool.query(
+      `
+        INSERT INTO user_oauth_tokens
+          (user_id, provider, access_token, refresh_token, token_type, scope, expires_at)
+        VALUES (?, 'spotify', ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          access_token = VALUES(access_token),
+          refresh_token = VALUES(refresh_token),
+          token_type = VALUES(token_type),
+          scope = VALUES(scope),
+          expires_at = VALUES(expires_at)
+      `,
+      [userId, accessToken, refreshToken, tokenType, scope, expiresAt]
+    );
+  } catch (err) {
+    if (!isFallbackError(err)) {
+      throw err;
+    }
+
+    const tokens = await readCollection(tokensFile, []);
+    const nextToken = {
+      user_id: userId,
+      provider: "spotify",
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: tokenType,
+      scope,
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    };
+    const existingIndex = tokens.findIndex((token) => token.user_id === userId && token.provider === "spotify");
+
+    if (existingIndex >= 0) {
+      tokens[existingIndex] = { ...tokens[existingIndex], ...nextToken };
+    } else {
+      tokens.push({ ...nextToken, created_at: new Date().toISOString() });
+    }
+
+    await writeCollection(tokensFile, tokens);
+  }
 }
 
 export async function getSpotifyConnectionStatus(userId) {
-  await ensureOAuthTokenTable();
+  try {
+    await ensureOAuthTokenTable();
 
-  const [rows] = await pool.query(
-    `
-      SELECT provider, expires_at, updated_at
-      FROM user_oauth_tokens
-      WHERE user_id = ? AND provider = 'spotify'
-      LIMIT 1
-    `,
-    [userId]
-  );
+    const [rows] = await pool.query(
+      `
+        SELECT provider, expires_at, updated_at
+        FROM user_oauth_tokens
+        WHERE user_id = ? AND provider = 'spotify'
+        LIMIT 1
+      `,
+      [userId]
+    );
 
-  if (rows.length === 0) {
-    return { connected: false };
+    if (rows.length === 0) {
+      return { connected: false };
+    }
+
+    const token = rows[0];
+    return {
+      connected: true,
+      provider: token.provider,
+      expiresAt: token.expires_at,
+      updatedAt: token.updated_at,
+    };
+  } catch (err) {
+    if (!isFallbackError(err)) {
+      throw err;
+    }
+
+    const tokens = await readCollection(tokensFile, []);
+    const token = tokens.find((entry) => entry.user_id === userId && entry.provider === "spotify");
+
+    if (!token) {
+      return { connected: false };
+    }
+
+    return {
+      connected: true,
+      provider: token.provider,
+      expiresAt: token.expires_at || null,
+      updatedAt: token.updated_at || null,
+    };
   }
-
-  const token = rows[0];
-  return {
-    connected: true,
-    provider: token.provider,
-    expiresAt: token.expires_at,
-    updatedAt: token.updated_at,
-  };
 }
