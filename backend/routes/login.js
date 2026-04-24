@@ -40,7 +40,6 @@ router.post("/", async (req, res) => {
       message: "Login successful",
       userId: user.id,
       firstName: user.firstName || "",
-    Logger.logError("Login error", err);
     });
   } catch (err) {
     console.log(err);
