@@ -10,6 +10,7 @@ import spotifyAuthRoute from "./routes/spotifyAuth.js";
 dotenv.config();
 
 const app = express();
+const port = Number.parseInt(process.env.PORT || "3000", 10);
 
 // Middleware
 app.use(cors());
@@ -27,6 +28,6 @@ app.get("/test", (req, res) => {
 });
 
 // Start server
-app.listen(process.env.PORT, () => {
-  console.log(`Backend running on port ${process.env.PORT}`);
+app.listen(port, () => {
+  console.log(`Backend running on port ${port}`);
 });

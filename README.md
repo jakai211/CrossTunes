@@ -8,6 +8,23 @@ Use the app in `frontend/` at the repository root. That is the current frontend 
 
 The nested `CrossTunes/frontend/` app is an older copy and should be treated as legacy unless you intentionally want that version.
 
+## First-time setup
+
+Install dependencies once after cloning:
+
+```bash
+npm install --prefix frontend
+npm install --prefix backend
+```
+
+Optional backend environment file:
+
+```bash
+copy backend\.env.example backend\.env
+```
+
+The backend now defaults to port `3000` even without `.env`. Spotify, YouTube, SoundCloud, and MySQL settings are only needed if you want those integrations enabled.
+
 ## Run the updated frontend
 
 From the repository root:
