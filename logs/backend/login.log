@@ -1,2 +1,3 @@
 {"timestamp":"2026-04-24T02:58:47.194Z","event":"login","email":"yash@gmail.com","userId":1,"firstName":"Yash","success":true,"ip":null}
 {"timestamp":"2026-04-24T02:58:48.315Z","event":"login","email":"yash@gmail.com","userId":1,"firstName":"Yash","success":true,"ip":null}
+{"timestamp":"2026-04-24T14:53:28.806Z","event":"login","email":"test@test.com","userId":1,"firstName":"Tester1","success":true,"ip":null}

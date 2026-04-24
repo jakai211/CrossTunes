@@ -32,7 +32,6 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Password must be at least 8 characters long" });
   }
   // Check for forbidden characters in password
-  const forbiddenChars = /[<>\\/='"\|\[\]{}~`]/;
   if (forbiddenChars.test(String(password))) {
     return res.status(400).json({ error: "Invalid characters in password." });
   }
