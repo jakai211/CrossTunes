@@ -220,6 +220,19 @@
   font-size: 0.78rem;
 }
 
+/* ── Song Search ── */
+.song-search-section {
+  margin-bottom: 40px;
+  padding: 20px;
+  border: 1px solid rgba(29, 185, 84, 0.22);
+  border-radius: 20px;
+  background: rgba(29, 185, 84, 0.05);
+}
+
+.song-search-results {
+  margin-top: 20px;
+}
+
 @media (max-width: 480px) {
   .dj-widget-wrap {
     right: 14px;

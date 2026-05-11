@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { login, register } from './api/auth.js'
+import { searchSongs } from './api/music.js'
 
 const featuredPlaylists = [
   {
@@ -303,8 +304,27 @@ function SourcePills({ sources }) {
   )
 }
 
-function SongCard({ song, index, comments = [], onAddComment, onRemoveComment }) {
+function SongCard({ song, index, comments = [], onAddComment, onRemoveComment, onPlay, isPlaying }) {
   const [draftComment, setDraftComment] = useState('')
+
+  const handleCardPlay = (event) => {
+    if (event.target.closest('button, input, form, a')) {
+      return
+    }
+
+    onPlay(song)
+  }
+
+  const handleCardKeyDown = (event) => {
+    if (event.target.closest('button, input, form, a')) {
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onPlay(song)
+    }
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -315,7 +335,14 @@ function SongCard({ song, index, comments = [], onAddComment, onRemoveComment })
   }
 
   return (
-    <article className="song-card">
+    <article
+      className={`song-card ${isPlaying ? 'song-card--playing' : ''}`}
+      onClick={handleCardPlay}
+      onKeyDown={handleCardKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`Play ${song.title} by ${song.artist}`}
+    >
       <div className="song-card-rank" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
       <div className="song-card-art" aria-hidden="true">
         <span className="song-art-inner"></span>
@@ -327,15 +354,20 @@ function SongCard({ song, index, comments = [], onAddComment, onRemoveComment })
       </div>
       <div className="song-card-meta">
         <span className={`song-source-badge ${song.source.toLowerCase()}`}>
-          {sourceMarks[song.source]}
+          {sourceMarks[song.source] || song.source.slice(0, 2).toUpperCase()}
         </span>
         <span className="song-mood-tag">{song.mood}</span>
       </div>
       <div className="song-card-right">
         <span className="song-plays">{song.plays}</span>
         <span className="song-duration">{song.duration}</span>
-        <button type="button" className="song-play-btn" aria-label={`Play ${song.title}`}>
-          &#9654;
+        <button
+          type="button"
+          className={`song-play-btn ${isPlaying ? 'is-playing' : ''}`}
+          onClick={() => onPlay(song)}
+          aria-label={`${isPlaying ? 'Pause' : 'Play'} ${song.title}`}
+        >
+          {isPlaying ? '❚❚' : '▶'}
         </button>
       </div>
 
@@ -417,6 +449,14 @@ function App() {
   const [chatResult, setChatResult] = useState(null)
   const [isThinking, setIsThinking] = useState(false)
   const [chatHint, setChatHint] = useState('')
+  const [songSearchResults, setSongSearchResults] = useState([])
+  const [songSearchError, setSongSearchError] = useState('')
+  const [songSearchUnavailableSources, setSongSearchUnavailableSources] = useState([])
+  const [isSongSearchLoading, setIsSongSearchLoading] = useState(false)
+  const [songSearchQuery, setSongSearchQuery] = useState('')
+  const [currentPlayingSongId, setCurrentPlayingSongId] = useState(null)
+  const [activePlayer, setActivePlayer] = useState(null)
+  const audioRef = useRef(null)
 
   const [songComments, setSongComments] = useState({
     1: ['Smooth drive anthem, this hits late night mode'],
@@ -511,8 +551,27 @@ function App() {
     return matchesSearch && matchesPlatform
   })
 
-  const hubPreview = filteredPlaylists.slice(0, 3)
-  const searchableSources = new Set(filteredPlaylists.flatMap((playlist) => playlist.sources))
+  useEffect(() => {
+    const query = songSearchQuery.trim()
+
+    if (query.length < 2) {
+      setSongSearchResults([])
+      setSongSearchError('')
+      setSongSearchUnavailableSources([])
+      return
+    }
+
+    const timerId = window.setTimeout(async () => {
+      setIsSongSearchLoading(true)
+      const result = await searchSongs(query, activePlatforms, 10)
+      setSongSearchResults(result.songs)
+      setSongSearchError(result.error || '')
+      setSongSearchUnavailableSources(result.unavailableSources || [])
+      setIsSongSearchLoading(false)
+    }, 350)
+
+    return () => window.clearTimeout(timerId)
+  }, [songSearchQuery, activePlatforms])
 
   const filteredMyPlaylists = myPlaylists
     .filter((pl) => playlistPlatform === 'All' || pl.sources.includes(playlistPlatform))
@@ -597,6 +656,202 @@ function App() {
     setUserName('')
     setUserId(null)
     navigateTo('home')
+  }
+
+  const normalizeTrackText = (value) => {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  const getTrackTokens = (value) => {
+    return normalizeTrackText(value).split(' ').filter(Boolean)
+  }
+
+  const getPlaybackMatchScore = (baseSong, candidateSong) => {
+    if (!candidateSong || candidateSong.id === baseSong.id) return -1
+
+    const baseTokens = getTrackTokens(`${baseSong.title} ${baseSong.artist}`)
+    const candidateTokens = getTrackTokens(`${candidateSong.title} ${candidateSong.artist}`)
+
+    const matches = baseTokens.filter(token => candidateTokens.includes(token)).length
+    const totalTokens = Math.max(baseTokens.length, candidateTokens.length)
+
+    if (totalTokens === 0) return 0
+    return Math.round((matches / totalTokens) * 10)
+  }
+
+  const getEmbedUrl = (song) => {
+    if (!song?.trackUrl) return null
+
+    if (song.source === 'Spotify') {
+      const match = song.trackUrl.match(/track\/([a-zA-Z0-9]+)/)
+      return match ? `https://open.spotify.com/embed/track/${match[1]}` : null
+    }
+
+    if (song.source === 'YouTube') {
+      try {
+        const parsedUrl = new URL(song.trackUrl)
+        const videoId = parsedUrl.searchParams.get('v')
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`
+        }
+      } catch {
+        return null
+      }
+      return null
+    }
+
+    if (song.source === 'SoundCloud') {
+      return `https://w.soundcloud.com/player/?url=${encodeURIComponent(song.trackUrl)}&auto_play=true`
+    }
+
+    return null
+  }
+
+  const getPlaybackCandidates = (song) => [song, ...songSearchResults, ...trendingSongs]
+
+  const getFullPlaybackEntry = (song) => {
+    const sourceBonus = {
+      YouTube: 8,
+      SoundCloud: 6,
+      Spotify: 3,
+    }
+
+    return getPlaybackCandidates(song)
+      .map((candidate) => {
+        const embedUrl = getEmbedUrl(candidate)
+        if (!embedUrl) return null
+
+        const matchScore = candidate.id === song.id ? 18 : getPlaybackMatchScore(song, candidate)
+        const score = matchScore + (sourceBonus[candidate.source] || 0)
+        if (score < 6) return null
+
+        return { candidate, embedUrl, score }
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score)[0] || null
+  }
+
+  const getPreviewPlaybackEntry = (song) => {
+    return getPlaybackCandidates(song)
+      .map((candidate) => {
+        if (!candidate.previewUrl) return null
+
+        const score = candidate.id === song.id ? 18 : getPlaybackMatchScore(song, candidate)
+        if (score < 6) return null
+
+        return { candidate, score }
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score)[0] || null
+  }
+
+  const getPlaybackNote = (requestedSong, playbackSong, mode) => {
+    if (!playbackSong) return ''
+
+    if (mode === 'embed') {
+      if (requestedSong.source !== playbackSong.source) {
+        return `Full track matched from ${playbackSong.source} for this song.`
+      }
+
+      return `Full playback via ${playbackSong.source}.`
+    }
+
+    if (requestedSong.source !== playbackSong.source) {
+      return `Preview matched from ${playbackSong.source} while a full track was not available.`
+    }
+
+    return `Preview playback from ${playbackSong.source}.`
+  }
+
+  const closeActivePlayer = () => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+    }
+    setCurrentPlayingSongId(null)
+    setActivePlayer(null)
+  }
+
+  const handlePlaySong = async (song) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (activePlayer?.type === 'embed' && activePlayer.requestedSongId === song.id) {
+      closeActivePlayer()
+      return
+    }
+
+    const fullPlaybackEntry = getFullPlaybackEntry(song)
+    if (fullPlaybackEntry) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      setCurrentPlayingSongId(song.id)
+      setActivePlayer({
+        type: 'embed',
+        title: song.title,
+        artist: song.artist,
+        source: fullPlaybackEntry.candidate.source,
+        embedUrl: fullPlaybackEntry.embedUrl,
+        requestedSongId: song.id,
+        note: getPlaybackNote(song, fullPlaybackEntry.candidate, 'embed'),
+      })
+      return
+    }
+
+    const previewPlaybackEntry = getPreviewPlaybackEntry(song)
+    const previewSong = previewPlaybackEntry?.candidate || song
+
+    if (previewSong.previewUrl) {
+      setActivePlayer({
+        type: 'preview',
+        title: song.title,
+        artist: song.artist,
+        source: previewSong.source,
+        requestedSongId: song.id,
+        note: getPlaybackNote(song, previewSong, 'preview'),
+      })
+
+      if (currentPlayingSongId === song.id && !audio.paused) {
+        audio.pause()
+        setCurrentPlayingSongId(null)
+        setActivePlayer(null)
+        return
+      }
+
+      try {
+        audio.src = previewSong.previewUrl
+        await audio.play()
+        setCurrentPlayingSongId(song.id)
+      } catch {
+        setActivePlayer({
+          type: 'unavailable',
+          title: song.title,
+          artist: song.artist,
+          source: previewSong.source,
+          requestedSongId: song.id,
+          note: 'Playback not available for this track in CrossTunes.',
+        })
+      }
+      return
+    }
+
+    setActivePlayer({
+      type: 'unavailable',
+      title: song.title,
+      artist: song.artist,
+      source: song.source || 'Unknown',
+      requestedSongId: song.id,
+      note: 'Playback not available for this track in CrossTunes.',
+    })
   }
 
   const filterForbiddenChars = (value) => {
@@ -772,6 +1027,91 @@ function App() {
             </div>
           </section>
 
+          {/* ── Song Search ── */}
+          {isLoggedIn && (
+            <section className="song-search-section">
+              <h2 className="hub-section-title">Search Songs</h2>
+              <div className="search-bar-wrap">
+                <label className="search-input-shell" htmlFor="song-search">
+                  <span className="search-icon" aria-hidden="true">&#9835;</span>
+                  <input
+                    id="song-search"
+                    type="text"
+                    value={songSearchQuery}
+                    onChange={(event) => setSongSearchQuery(event.target.value)}
+                    placeholder="Search for songs, artists, or albums..."
+                  />
+                  {songSearchQuery && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      onClick={() => setSongSearchQuery('')}
+                      aria-label="Clear song search"
+                    >✕</button>
+                  )}
+                </label>
+                <div className="platform-filter-row" aria-label="Filter by platform">
+                  {platformOptions.map((platform) => {
+                    const isActive = activePlatforms.includes(platform)
+                    return (
+                      <button
+                        key={platform}
+                        type="button"
+                        className={`platform-chip platform-chip--${platform.toLowerCase()} ${isActive ? 'active' : ''}`}
+                        onClick={() => togglePlatform(platform)}
+                      >
+                        <span className="platform-chip-mark" aria-hidden="true">{sourceMarks[platform]}</span>
+                        <span>{platform}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {songSearchQuery.trim().length > 0 && (
+                <div className="song-search-results">
+                  {isSongSearchLoading && <p className="search-no-results">Searching songs...</p>}
+                  {!isSongSearchLoading && songSearchError && <p className="search-no-results">{songSearchError}</p>}
+                  {!isSongSearchLoading && !songSearchError && songSearchUnavailableSources.length > 0 && (
+                    <p className="search-no-results">
+                      Some sources are unavailable: {songSearchUnavailableSources.join(', ')}
+                    </p>
+                  )}
+                  {!isSongSearchLoading && !songSearchError && songSearchResults.length === 0 && songSearchQuery.trim().length >= 2 && (
+                    <p className="search-no-results">No song results found for "{songSearchQuery}".</p>
+                  )}
+                  {!isSongSearchLoading && !songSearchError && songSearchResults.length > 0 && (
+                    <div className="song-grid">
+                      {songSearchResults.map((song, i) => (
+                        <SongCard
+                          key={`song-${song.id}-${i}`}
+                          song={{
+                            id: song.id,
+                            title: song.title,
+                            artist: song.artist,
+                            album: song.album,
+                            duration: song.duration,
+                            mood: song.genre,
+                            source: song.source,
+                            plays: 'Search',
+                            previewUrl: song.previewUrl,
+                            trackUrl: song.trackUrl,
+                          }}
+                          index={i}
+                          comments={songComments[song.id] || []}
+                          onAddComment={addSongComment}
+                          onRemoveComment={removeSongComment}
+                          onPlay={handlePlaySong}
+                          isPlaying={currentPlayingSongId === song.id}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* ── Live search results ── */}
           {normalizedSearch.length > 0 && (
             <section className="search-results-section">
@@ -814,6 +1154,8 @@ function App() {
                   comments={songComments[song.id] || []}
                   onAddComment={addSongComment}
                   onRemoveComment={removeSongComment}
+                  onPlay={handlePlaySong}
+                  isPlaying={currentPlayingSongId === song.id}
                 />
               ))}
             </div>
@@ -1173,6 +1515,53 @@ function App() {
       )}
     </>
   )
-}
 
-export default App
+  return (
+    <>
+      <header className="nav-shell">
+
+      {activePlayer && (
+        <section className="site-player-dock" aria-label="Now playing">
+          <div className="site-player-head">
+            <div>
+              <p className="site-player-kicker">Now Playing on {activePlayer.source || 'CrossTunes'}</p>
+              <h3>{activePlayer.title}</h3>
+              <p>{activePlayer.artist}</p>
+              {activePlayer.note ? <p className="site-player-note">{activePlayer.note}</p> : null}
+            </div>
+            <button type="button" className="site-player-close" onClick={closeActivePlayer} aria-label="Close player">✕</button>
+          </div>
+
+          {activePlayer.type === 'embed' && activePlayer.embedUrl && (
+            <iframe
+              className="site-player-embed"
+              src={activePlayer.embedUrl}
+              title={`${activePlayer.title} player`}
+              allow="autoplay; encrypted-media; clipboard-write; fullscreen"
+              loading="lazy"
+            />
+          )}
+
+          {activePlayer.type === 'unavailable' && (
+            <div className="site-player-unavailable">
+              <p>This track is not available for playback in CrossTunes. Try searching for an alternative version across platforms.</p>
+            </div>
+          )}
+        </section>
+      )}
+
+      <audio
+        ref={audioRef}
+        className={activePlayer?.type === 'preview' ? 'site-player-audio site-player-audio--active' : 'site-player-audio'}
+        controls
+        onEnded={() => setCurrentPlayingSongId(null)}
+        onPause={() => {
+          if (audioRef.current?.ended) return
+          if (audioRef.current?.currentTime === 0) return
+          setCurrentPlayingSongId(null)
+          if (activePlayer?.type === 'preview') setActivePlayer(null)
+        }}
+      />
+    </>
+  )
+}
