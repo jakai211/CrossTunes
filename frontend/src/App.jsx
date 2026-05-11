@@ -544,6 +544,7 @@ function App() {
   const [songSearchError, setSongSearchError] = useState('')
   const [songSearchUnavailableSources, setSongSearchUnavailableSources] = useState([])
   const [isSongSearchLoading, setIsSongSearchLoading] = useState(false)
+  const [songSearchQuery, setSongSearchQuery] = useState('')
   const [currentPlayingSongId, setCurrentPlayingSongId] = useState(null)
   const [activePlayer, setActivePlayer] = useState(null)
   const audioRef = useRef(null)
@@ -909,6 +910,28 @@ function App() {
     return () => window.clearTimeout(timerId)
   }, [searchQuery, activePlatforms])
 
+  useEffect(() => {
+    const query = songSearchQuery.trim()
+
+    if (query.length < 2) {
+      setSongSearchResults([])
+      setSongSearchError('')
+      setSongSearchUnavailableSources([])
+      return
+    }
+
+    const timerId = window.setTimeout(async () => {
+      setIsSongSearchLoading(true)
+      const result = await searchSongs(query, activePlatforms, 10)
+      setSongSearchResults(result.songs)
+      setSongSearchError(result.error || '')
+      setSongSearchUnavailableSources(result.unavailableSources || [])
+      setIsSongSearchLoading(false)
+    }, 350)
+
+    return () => window.clearTimeout(timerId)
+  }, [songSearchQuery, activePlatforms])
+
   const handleCreatePlaylist = (event) => {
     event.preventDefault()
     const trimmed = newPlaylistName.trim()
@@ -1158,6 +1181,89 @@ function App() {
                 <span className="search-result-count">{filteredPlaylists.length} playlists</span>
               </div>
             </div>
+          </section>
+
+          {/* ── Song Search ── */}
+          <section className="song-search-section">
+            <h2 className="hub-section-title">Search Songs</h2>
+            <div className="search-bar-wrap">
+              <label className="search-input-shell" htmlFor="song-search">
+                <span className="search-icon" aria-hidden="true">&#9835;</span>
+                <input
+                  id="song-search"
+                  type="text"
+                  value={songSearchQuery}
+                  onChange={(event) => setSongSearchQuery(event.target.value)}
+                  placeholder="Search for songs, artists, or albums..."
+                />
+                {songSearchQuery && (
+                  <button
+                    type="button"
+                    className="search-clear-btn"
+                    onClick={() => setSongSearchQuery('')}
+                    aria-label="Clear song search"
+                  >✕</button>
+                )}
+              </label>
+              <div className="platform-filter-row" aria-label="Filter by platform">
+                {platformOptions.map((platform) => {
+                  const isActive = activePlatforms.includes(platform)
+                  return (
+                    <button
+                      key={platform}
+                      type="button"
+                      className={`platform-chip platform-chip--${platform.toLowerCase()} ${isActive ? 'active' : ''}`}
+                      onClick={() => togglePlatform(platform)}
+                    >
+                      <span className="platform-chip-mark" aria-hidden="true">{sourceMarks[platform]}</span>
+                      <span>{platform}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {songSearchQuery.trim().length > 0 && (
+              <div className="song-search-results">
+                {isSongSearchLoading && <p className="search-no-results">Searching songs...</p>}
+                {!isSongSearchLoading && songSearchError && <p className="search-no-results">{songSearchError}</p>}
+                {!isSongSearchLoading && !songSearchError && songSearchUnavailableSources.length > 0 && (
+                  <p className="search-no-results">
+                    Some sources are unavailable: {songSearchUnavailableSources.join(', ')}
+                  </p>
+                )}
+                {!isSongSearchLoading && !songSearchError && songSearchResults.length === 0 && songSearchQuery.trim().length >= 2 && (
+                  <p className="search-no-results">No song results found for "{songSearchQuery}".</p>
+                )}
+                {!isSongSearchLoading && !songSearchError && songSearchResults.length > 0 && (
+                  <div className="song-grid">
+                    {songSearchResults.map((song, i) => (
+                      <SongCard
+                        key={`song-${song.id}-${i}`}
+                        song={{
+                          id: song.id,
+                          title: song.title,
+                          artist: song.artist,
+                          album: song.album,
+                          duration: song.duration,
+                          mood: song.genre,
+                          source: song.source,
+                          plays: 'Search',
+                          previewUrl: song.previewUrl,
+                          trackUrl: song.trackUrl,
+                        }}
+                        index={i}
+                        comments={songComments[song.id] || []}
+                        onAddComment={addSongComment}
+                        onRemoveComment={removeSongComment}
+                        onPlay={handlePlaySong}
+                        isPlaying={currentPlayingSongId === song.id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* ── Live search results ── */}
