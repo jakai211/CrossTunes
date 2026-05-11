@@ -667,6 +667,16 @@
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
 }
 
+.pl-modal-wide {
+  width: min(85vw, 600px);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.pl-modal-body {
+  margin-bottom: 22px;
+}
+
 .pl-modal-header {
   display: flex;
   align-items: center;
@@ -692,6 +702,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 160ms ease;
+}
+
+.pl-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-main);
 }
 
 .pl-modal-form {
@@ -1896,4 +1913,132 @@
   .auth-card { padding: 22px; }
   .name-row { grid-template-columns: 1fr; }
   .friends-activity-list { grid-template-columns: 1fr; }
+}
+
+/* ── Playlist Song Adding ── */
+.pl-add-songs-btn {
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.3);
+  color: #1db954;
+}
+
+.pl-add-songs-btn:hover {
+  border-color: rgba(29, 185, 84, 0.6);
+  color: #1db954;
+}
+
+.song-card-compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 160ms ease;
+}
+
+.song-card-compact:hover {
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+.song-card-compact .song-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.song-card-compact .song-card-title {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-card-compact .song-card-artist {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.song-card-compact .song-card-source {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.song-add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(29, 185, 84, 0.2);
+  color: #1db954;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.song-add-btn:hover {
+  background: rgba(29, 185, 84, 0.4);
+  transform: scale(1.1);
+}
+
+/* ── Song Search Modal ── */
+.song-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.song-search-input-group {
+  position: relative;
+}
+
+.song-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.song-search-input:focus {
+  outline: none;
+  border-color: rgba(123, 47, 247, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.song-search-spinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+}
+
+.song-search-error {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+.song-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
 }

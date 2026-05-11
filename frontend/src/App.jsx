@@ -549,6 +549,13 @@ function App() {
   const [activePlayer, setActivePlayer] = useState(null)
   const audioRef = useRef(null)
 
+  // Playlist song adding state
+  const [playlistAddingSongs, setPlaylistAddingSongs] = useState(null) // ID of playlist being edited
+  const [playlistSongSearchQuery, setPlaylistSongSearchQuery] = useState('')
+  const [playlistSongSearchResults, setPlaylistSongSearchResults] = useState([])
+  const [playlistSongSearchLoading, setPlaylistSongSearchLoading] = useState(false)
+  const [playlistSongSearchError, setPlaylistSongSearchError] = useState('')
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -932,6 +939,27 @@ function App() {
     return () => window.clearTimeout(timerId)
   }, [songSearchQuery, activePlatforms])
 
+  // Playlist song search effect
+  useEffect(() => {
+    const query = playlistSongSearchQuery.trim()
+
+    if (query.length < 2 || !playlistAddingSongs) {
+      setPlaylistSongSearchResults([])
+      setPlaylistSongSearchError('')
+      return
+    }
+
+    const timerId = window.setTimeout(async () => {
+      setPlaylistSongSearchLoading(true)
+      const result = await searchSongs(query, activePlatforms, 10)
+      setPlaylistSongSearchResults(result.songs)
+      setPlaylistSongSearchError(result.error || '')
+      setPlaylistSongSearchLoading(false)
+    }, 350)
+
+    return () => window.clearTimeout(timerId)
+  }, [playlistSongSearchQuery, activePlatforms, playlistAddingSongs])
+
   const handleCreatePlaylist = (event) => {
     event.preventDefault()
     const trimmed = newPlaylistName.trim()
@@ -950,6 +978,37 @@ function App() {
     setNewPlaylistName('')
     setNewPlaylistSource('Spotify')
     setIsCreatingPlaylist(false)
+  }
+
+  const handleAddSongsToPlaylist = (playlistId) => {
+    setPlaylistAddingSongs(playlistId)
+    setPlaylistSongSearchQuery('')
+    setPlaylistSongSearchResults([])
+    setPlaylistSongSearchError('')
+  }
+
+  const handleCloseAddSongs = () => {
+    setPlaylistAddingSongs(null)
+    setPlaylistSongSearchQuery('')
+    setPlaylistSongSearchResults([])
+    setPlaylistSongSearchError('')
+  }
+
+  const handleAddSongToPlaylist = (song) => {
+    setMyPlaylists((prev) =>
+      prev.map((playlist) =>
+        playlist.id === playlistAddingSongs
+          ? {
+              ...playlist,
+              tracks: playlist.tracks + 1,
+              updated: 'Just now',
+              // In a real app, you'd add the song to a songs array
+            }
+          : playlist
+      )
+    )
+    // Show some feedback that the song was added
+    alert(`Added "${song.title}" by ${song.artist} to playlist!`)
   }
 
   const handleRecommend = (event) => {
@@ -1468,6 +1527,7 @@ function App() {
                     <SourcePills sources={playlist.sources} />
                     <div className="pl-card-actions">
                       <button type="button" className="pl-action-btn">View</button>
+                      <button type="button" className="pl-add-songs-btn" onClick={() => handleAddSongsToPlaylist(playlist.id)}>Add Songs</button>
                       <button type="button" className="pl-action-btn">Share</button>
                     </div>
                   </div>
@@ -1539,6 +1599,66 @@ function App() {
             </div>
           )}
         </main>
+      )}
+
+      {/* Playlist song adding modal */}
+      {playlistAddingSongs && (
+        <div className="pl-modal-overlay" role="dialog" aria-modal="true" aria-label="Add songs to playlist">
+          <div className="pl-modal pl-modal-wide">
+            <div className="pl-modal-header">
+              <h2>Add Songs to Playlist</h2>
+              <button
+                type="button"
+                className="pl-modal-close"
+                onClick={handleCloseAddSongs}
+                aria-label="Close add songs modal"
+              >
+                ×
+              </button>
+            </div>
+            <div className="pl-modal-body">
+              <div className="song-search-container">
+                <div className="song-search-input-group">
+                  <input
+                    type="text"
+                    className="song-search-input"
+                    placeholder="Search for songs to add..."
+                    value={playlistSongSearchQuery}
+                    onChange={(e) => setPlaylistSongSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  {playlistSongSearchLoading && <div className="song-search-spinner" aria-hidden="true">⟳</div>}
+                </div>
+                {playlistSongSearchError && (
+                  <div className="song-search-error" role="alert">
+                    {playlistSongSearchError}
+                  </div>
+                )}
+                {playlistSongSearchResults.length > 0 && (
+                  <div className="song-results-list">
+                    {playlistSongSearchResults.map((song) => (
+                      <div key={song.id} className="song-card-compact">
+                        <div className="song-card-info">
+                          <h3 className="song-card-title">{song.title}</h3>
+                          <p className="song-card-artist">{song.artist}</p>
+                          <span className="song-card-source">{song.source}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="song-add-btn"
+                          onClick={() => handleAddSongToPlaylist(song)}
+                          aria-label={`Add ${song.title} by ${song.artist} to playlist`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {currentPage === 'friends' && (
