@@ -98,6 +98,7 @@ const defaultPersonalPlaylists = [
     summary: 'UI reviews, design sessions, and deep build sprints.',
     sources: ['Spotify'],
     updated: '2 hours ago',
+    songs: [], // Will be populated when songs are added
   },
   {
     id: 2,
@@ -106,6 +107,7 @@ const defaultPersonalPlaylists = [
     summary: 'Low-glow synth and wide-open road selections.',
     sources: ['YouTube', 'SoundCloud'],
     updated: 'Yesterday',
+    songs: [], // Will be populated when songs are added
   },
   {
     id: 3,
@@ -114,6 +116,7 @@ const defaultPersonalPlaylists = [
     summary: 'Collaborator submissions waiting for a final pass.',
     sources: ['Spotify', 'YouTube'],
     updated: '3 days ago',
+    songs: [], // Will be populated when songs are added
   },
 ]
 
@@ -556,6 +559,9 @@ function App() {
   const [playlistSongSearchLoading, setPlaylistSongSearchLoading] = useState(false)
   const [playlistSongSearchError, setPlaylistSongSearchError] = useState('')
 
+  // Playlist viewing state
+  const [playlistViewing, setPlaylistViewing] = useState(null) // ID of playlist being viewed
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -973,6 +979,7 @@ function App() {
         summary: 'Empty playlist — start adding tracks.',
         sources: [newPlaylistSource],
         updated: 'Just now',
+        songs: [], // Initialize empty songs array
       },
     ])
     setNewPlaylistName('')
@@ -994,6 +1001,14 @@ function App() {
     setPlaylistSongSearchError('')
   }
 
+  const handleViewPlaylist = (playlistId) => {
+    setPlaylistViewing(playlistId)
+  }
+
+  const handleCloseViewPlaylist = () => {
+    setPlaylistViewing(null)
+  }
+
   const handleAddSongToPlaylist = (song) => {
     setMyPlaylists((prev) =>
       prev.map((playlist) =>
@@ -1002,7 +1017,7 @@ function App() {
               ...playlist,
               tracks: playlist.tracks + 1,
               updated: 'Just now',
-              // In a real app, you'd add the song to a songs array
+              songs: [...playlist.songs, song], // Add the song to the songs array
             }
           : playlist
       )
@@ -1526,7 +1541,7 @@ function App() {
                   <div className="pl-card-footer">
                     <SourcePills sources={playlist.sources} />
                     <div className="pl-card-actions">
-                      <button type="button" className="pl-action-btn">View</button>
+                      <button type="button" className="pl-action-btn" onClick={() => handleViewPlaylist(playlist.id)}>View</button>
                       <button type="button" className="pl-add-songs-btn" onClick={() => handleAddSongsToPlaylist(playlist.id)}>Add Songs</button>
                       <button type="button" className="pl-action-btn">Share</button>
                     </div>
@@ -1660,6 +1675,72 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Playlist viewing modal */}
+      {playlistViewing && (() => {
+        const playlist = myPlaylists.find(p => p.id === playlistViewing)
+        if (!playlist) return null
+
+        return (
+          <div className="pl-modal-overlay" role="dialog" aria-modal="true" aria-label={`View playlist ${playlist.name}`}>
+            <div className="pl-modal pl-modal-wide">
+              <div className="pl-modal-header">
+                <div>
+                  <h2>{playlist.name}</h2>
+                  <p className="playlist-meta">
+                    {playlist.tracks} tracks • {playlist.sources.join(', ')} • Updated {playlist.updated}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="pl-modal-close"
+                  onClick={handleCloseViewPlaylist}
+                  aria-label="Close playlist view"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="pl-modal-body">
+                {playlist.songs.length > 0 ? (
+                  <div className="playlist-songs-list">
+                    {playlist.songs.map((song, index) => (
+                      <div key={`${song.id}-${index}`} className="playlist-song-item">
+                        <div className="playlist-song-info">
+                          <div className="playlist-song-rank">{index + 1}</div>
+                          <div className="playlist-song-details">
+                            <h3 className="playlist-song-title">{song.title}</h3>
+                            <p className="playlist-song-artist">{song.artist}</p>
+                          </div>
+                        </div>
+                        <div className="playlist-song-meta">
+                          <span className="playlist-song-source">{song.source}</span>
+                          <button
+                            type="button"
+                            className="playlist-song-play"
+                            onClick={() => {
+                              setCurrentPlayingSongId(song.id)
+                              setActivePlayer(song.source.toLowerCase())
+                            }}
+                            aria-label={`Play ${song.title} by ${song.artist}`}
+                          >
+                            ▶
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="playlist-empty-state">
+                    <span className="playlist-empty-icon" aria-hidden="true">♪</span>
+                    <h3>No songs yet</h3>
+                    <p>This playlist is empty. Click "Add Songs" to start building your collection!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {currentPage === 'friends' && (
         <main className="container page-shell stack-page">
