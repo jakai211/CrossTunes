@@ -1717,10 +1717,7 @@ function App() {
                           <button
                             type="button"
                             className="playlist-song-play"
-                            onClick={() => {
-                              setCurrentPlayingSongId(song.id)
-                              setActivePlayer(song.source.toLowerCase())
-                            }}
+                            onClick={() => handlePlaySong(song)}
                             aria-label={`Play ${song.title} by ${song.artist}`}
                           >
                             ▶
