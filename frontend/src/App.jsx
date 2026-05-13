@@ -532,7 +532,16 @@ function App() {
   const [currentPage, setCurrentPage] = useState(() => getPageFromLocation())
   const [searchQuery, setSearchQuery] = useState('late night collaborative playlists')
   const [activePlatforms, setActivePlatforms] = useState(['Spotify', 'YouTube'])
-  const [myPlaylists, setMyPlaylists] = useState(defaultPersonalPlaylists)
+  const [myPlaylists, setMyPlaylists] = useState(() => {
+    const stored = window.localStorage.getItem('ct_my_playlists')
+    if (!stored) return defaultPersonalPlaylists
+
+    try {
+      return JSON.parse(stored)
+    } catch {
+      return defaultPersonalPlaylists
+    }
+  })
   const [playlistPlatform, setPlaylistPlatform] = useState('All')
   const [playlistSort, setPlaylistSort] = useState('updated')
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false)
@@ -825,6 +834,10 @@ function App() {
     window.localStorage.setItem('ct_user_id', String(userId))
     window.localStorage.setItem('ct_user_first_name', userFirstName)
   }, [userFirstName, userId])
+
+  useEffect(() => {
+    window.localStorage.setItem('ct_my_playlists', JSON.stringify(myPlaylists))
+  }, [myPlaylists])
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
